@@ -46,11 +46,13 @@ fi
 
 echo "Found ${#BASE64_FILES[@]} base64 files to process..."
 
-# Decode each base64 file back to binary
-for BASE64_FILE in "${BASE64_FILES[@]}"; do
-    # Extract part number from filename
-    PART_NUM=$(echo "$BASE64_FILE" | grep -o '[0-9]\+' | tail -1)
-    BINARY_FILE="${BASE_NAME}_part_$(printf "%03d" $PART_NUM).bin"
+# Decode each base64 file back to binary in order
+BINARY_FILES=()
+for i in "${!BASE64_FILES[@]}"; do
+    BASE64_FILE="${BASE64_FILES[$i]}"
+    # Create sequential binary filename
+    BINARY_FILE="${BASE_NAME}_part_$(printf "%03d" $((i+1))).bin"
+    BINARY_FILES+=("$BINARY_FILE")
     
     echo "Decoding $BASE64_FILE to $BINARY_FILE..."
     base64 -D -i "$BASE64_FILE" -o "$BINARY_FILE"
@@ -61,14 +63,16 @@ for BASE64_FILE in "${BASE64_FILES[@]}"; do
     fi
 done
 
-# Get list of binary files and sort them to ensure proper ordering
-BINARY_FILES=($(ls "${BASE_NAME}_part_"*.bin | sort -V))
-
-# Merge all binary files back into the original zip
+# Merge all binary files back into the original zip in correct order
 OUTPUT_ZIP="../${BASE_NAME}_reconstructed.zip"
 echo "Merging ${#BINARY_FILES[@]} parts into '$OUTPUT_ZIP'..."
 
-cat "${BINARY_FILES[@]}" > "$OUTPUT_ZIP"
+# Use > for first file, >> for subsequent files to ensure proper concatenation
+> "$OUTPUT_ZIP"  # Create empty file first
+for BINARY_FILE in "${BINARY_FILES[@]}"; do
+    echo "Appending $BINARY_FILE..."
+    cat "$BINARY_FILE" >> "$OUTPUT_ZIP"
+done
 
 # Verify the zip file
 if command -v unzip >/dev/null 2>&1; then
